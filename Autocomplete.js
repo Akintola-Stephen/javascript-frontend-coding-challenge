@@ -1,132 +1,146 @@
 export default class Autocomplete {
   constructor(rootEl, options = {}) {
-    options = Object.assign({ numOfResults: 10, data: [] }, options);
+    options = Object.assign(
+      {
+        numOfResults: 5,
+        data: [],
+        endpoint: "https://api.github.com/search/users",
+      },
+      options
+    );
     Object.assign(this, { rootEl, options });
 
     this.init();
   }
 
-  onQueryChange(query) {
-    let results;
-    //check if there is an endpoint provided
-    if (this.options.endPoint) {
-      this.getEndPointResults(query, this.options.endPoint);
-    } else {
-      this.getResults(query, this.options.data);
-    }
+  async onQueryChange(query) {
+    // Get data for the dropdown
+    await this.getResults(query).then((res) => this.updateDropdown(res));
   }
 
   /**
    * Given an array and a query, return a filtered array based on the query.
    */
-  getResults(query, data) {
+  async getResults(query) {
+    let { numOfResults, endpoint, data } = this.options;
     if (!query) return [];
-
-    // Filter for matching strings
-    let results = data.filter((item) => {
-      return item.text.toLowerCase().includes(query.toLowerCase());
-    });
-
-    results = results.slice(0, this.options.numOfResults);
-    this.updateDropdown(results);
-    this.keyboardNav(results);
-  }
-
-  getEndPointResults(query, endPoint) {
-    if (!query)  return [];
-
-    let results
-
-    fetch(`${endPoint}${query}`)
-    .then((response) => {
-      if(response.ok) {
-          return response.json();
-      } else {
-          throw new Error('Server response wasn\'t OK');
-      }
-    })
-    .then((data) => {
-      results = data.items.map((child) => {
-        return {text: child.login}
-      })
-      this.updateDropdown(results);
-      this.keyboardNav(results);
-    })
+    try {
+      const res = await fetch(
+        `${endpoint}?q=${query}&per_page=${numOfResults}`
+      );
+      data = await res.json();
+    } catch (err) {
+      console.log("Error: " + err);
+    }
+    return data.items;
   }
 
   updateDropdown(results) {
-    this.listEl.innerHTML = '';
-    this.listEl.appendChild(this.createResultsEl(results));
-  }
-
-  keyboardNav(results) {
-    const resultsLength = results.length
-    let activeIndex
-    let previousIndex
-
-    document.addEventListener('keydown', (event) => {
-      if (event.keyCode == 40) {
-        if (activeIndex == undefined) {
-          this.listEl.children[0].classList.add('active')
-          activeIndex = 0
-        } else {
-          previousIndex = activeIndex;
-          activeIndex++;
-          this.listEl.children[activeIndex].classList.add('active');
-          this.listEl.children[previousIndex].classList.remove('active');
-        }
-      }
-
-      if (event.keyCode == 38) {
-        if (activeIndex == undefined) {
-          activeIndex = resultsLength-1
-          this.listEl.children[activeIndex].classList.add('active')
-        } else {
-          previousIndex = activeIndex;
-          activeIndex--;
-          this.listEl.children[activeIndex].classList.add('active');
-          this.listEl.children[previousIndex].classList.remove('active');
-        }
-      }
-
-      if (event.keyCode === 13) {
-        const { onSelect } = this.options;
-        if (typeof onSelect === 'function') onSelect(this.listEl.children[activeIndex].innerText);
-      }
-
-    })
+    this.listEl.innerHTML = this.createResultsEl(results);
+    this.createArrowEventListener();
   }
 
   createResultsEl(results) {
-    const fragment = document.createDocumentFragment();
-    results.forEach((result) => {
-      const el = document.createElement('li');
-      Object.assign(el, {
-        className: 'result',
-        textContent: result.text
-      });
-
-      // Pass the value to the onSelect callback
-      el.addEventListener('click', (event) => {
-        const { onSelect } = this.options;
-        if (typeof onSelect === 'function') onSelect(result.value);
-      });
-
-      fragment.appendChild(el);
+    let listItems = "";
+    results.map((item) => {
+      listItems =
+        listItems +
+        `<li class="result"><a tabindex="0" href="${item.html_url}">${item.login}</li>`;
     });
-    return fragment;
+
+    return listItems;
+  }
+
+  // Adapted from https://stackoverflow.com/a/45984973/4718107
+  createArrowEventListener() {
+    const ul = this.listEl;
+    let liSelected;
+    let index = -1;
+
+    document.addEventListener(
+      "keydown",
+      function (e) {
+        let len = ul.getElementsByTagName("li").length - 1;
+        if (e.which === 40) {
+          index++;
+          //down
+          if (liSelected) {
+            removeClass(liSelected, "selected");
+            let next = ul.getElementsByTagName("li")[index];
+            if (typeof next !== undefined && index <= len) {
+              liSelected = next;
+            } else {
+              index = 0;
+              liSelected = ul.getElementsByTagName("li")[0];
+            }
+            liSelected.firstChild.focus();
+            addClass(liSelected, "selected");
+          } else {
+            index = 0;
+
+            liSelected = ul.getElementsByTagName("li")[0];
+            liSelected.firstChild.focus();
+            addClass(liSelected, "selected");
+          }
+        } else if (e.which === 38) {
+          //up
+          if (liSelected) {
+            removeClass(liSelected, "selected");
+            index--;
+            let next = ul.getElementsByTagName("li")[index];
+            if (typeof next !== undefined && index >= 0) {
+              liSelected = next;
+            } else {
+              index = len;
+              liSelected = ul.getElementsByTagName("li")[len];
+            }
+            liSelected.firstChild.focus();
+            addClass(liSelected, "selected");
+          } else {
+            index = 0;
+            liSelected = ul.getElementsByTagName("li")[len];
+            liSelected.firstChild.focus();
+            addClass(liSelected, "selected");
+          }
+        }
+      },
+      false
+    );
+
+    function removeClass(el, className) {
+      if (el.classList) {
+        el.classList.remove(className);
+      } else {
+        el.className = el.className.replace(
+          new RegExp(
+            "(^|\\b)" + className.split(" ").join("|") + "(\\b|$)",
+            "gi"
+          ),
+          " "
+        );
+      }
+    }
+
+    function addClass(el, className) {
+      if (el.classList) {
+        el.classList.add(className);
+      } else {
+        el.className += " " + className;
+      }
+    }
   }
 
   createQueryInputEl() {
-    const inputEl = document.createElement('input');
+    const inputEl = document.createElement("input");
     Object.assign(inputEl, {
-      type: 'search',
-      name: 'query',
-      autocomplete: 'off',
+      type: "search",
+      name: "query",
+      autocomplete: "off",
     });
 
-    inputEl.addEventListener('input', event =>
-      this.onQueryChange(event.target.value));
+    inputEl.addEventListener("input", (event) =>
+      this.onQueryChange(event.target.value)
+    );
 
     return inputEl;
   }
@@ -134,11 +148,11 @@ export default class Autocomplete {
   init() {
     // Build query input
     this.inputEl = this.createQueryInputEl();
-    this.rootEl.appendChild(this.inputEl)
+    this.rootEl.appendChild(this.inputEl);
 
     // Build results dropdown
-    this.listEl = document.createElement('ul');
-    Object.assign(this.listEl, { className: 'results' });
+    this.listEl = document.createElement("ul");
+    Object.assign(this.listEl, { className: "results", tabindex: "0" });
     this.rootEl.appendChild(this.listEl);
   }
 }

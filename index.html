@@ -1,22 +1,31 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8">
-    <title>Autocomplete</title>
-  </head>
-  <body style='font-family:ubuntu;'>
-    <!-- Using an array object -->
-    <div class="state-group form-group">
-      <label>State:</label>
-      <div id="state"></div>
-    </div>
 
-    <!-- Using a HTTP endpoint -->
-    <div class="gh-users-group form-group">
+<head>
+  <meta charset="utf-8">
+  <title>Autocomplete</title>
+</head>
+
+<body>
+  <!-- Using an array object -->
+
+  
+<div class="card">
+    <div class="state-group form-group">
+      <label><b>State:</b></label>
+      <div id="state"></div>
+
+      <br/>
+
       <label>Github User:</label>
       <div id="gh-user"></div>
     </div>
+</div>
 
-    <script src="/dist/bundle.js"></script>
-  </body>
+  <!-- Using a HTTP endpoint -->
+
+
+  <script src="/dist/bundle.js"></script>
+</body>
+
 </html>
